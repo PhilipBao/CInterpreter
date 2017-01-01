@@ -34,7 +34,7 @@ enum { LEA ,IMM ,JMP ,CALL,JZ ,JNZ ,ENT ,ADJ ,LEV ,LI ,LC ,SI ,SC , PUSH,
 /**
  * 3. Operators supported(tokens and classes)
  */
-enum { Num = 64, Fun, Sys, Glo, Loc, Id,
+enum { Num = 128, Fun, Sys, Glo, Loc, Id,
        Char, Else, Enum, If, Int, Return, Sizeof, While,
        Assign, Cond, Lor, Lan, Or, Xor, And, Eq, Ne, Lt, Gt, Le, Ge, Shl, Shr, Add, Sub, Mul, Div, Mod, Inc, Dec, Brak};
 
@@ -519,7 +519,9 @@ void expression(int level) {
             *++text = (tmp == Inc) ? ADD : SUB;
             *++text = (expr_type == CHAR) ? SC : SI;
         } else {
-            printf("%d: bad expression\n", line);
+            printf("%d: bad expression token=", line);
+            printf(getEnumStr(token));
+            printf("\n");
             exit(-1);
         }
     }
@@ -1172,7 +1174,7 @@ int main(int argc, char **argv) {
     argc--;
     argv++;
 
-    poolsize = 64 * 1024; // arbitrary size
+    poolsize = 127 * 1024; // arbitrary size
     line = 1;
 
     if ((fd = open(*argv, 0)) < 0) {

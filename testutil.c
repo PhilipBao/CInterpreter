@@ -107,4 +107,7 @@ const char* getEnumStr(int e) {
 		case INT  :  return "INT";
 		case PTR  :  return "PTR";
 	}
+	char *str = malloc(32);
+	snprintf(str, 16, "%d", e);
+	return str;
 }

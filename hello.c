@@ -1,7 +1,18 @@
 #include <stdio.h>
 // Comment Comment
 void dummy() {
-    ;
+    int t;
+    t = 1;
+    if (t == 1) {
+        ;
+    } else {
+        ;
+    }
+    if (t == 0) {
+        ;
+    } else {
+        ;
+    }
     return; // in-line comment
 }
 
@@ -10,16 +21,17 @@ int fibonacci(int i){
     {
         return 1;
     }
-    if (i == 3) dummy();
     return fibonacci(i-1) + fibonacci(i-2);
 }
 
 int main(){
     int i;
-    i = 0;
+    i=0;
     while (i < 10) {
-        printf("fibonacci(%2d) = %d\n", i, fibonacci(i));
+        printf("fibonacci(%d) = %d\n", i, fibonacci(i));
         i = i + 1;
     }
+    dummy();
+
     return 0;
 }
