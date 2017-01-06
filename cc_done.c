@@ -4,6 +4,9 @@
 #include <string.h>
 
 /**
+ * http://www.felixcloutier.com/x86/
+ *
+ *
  * Document
  * 1. Virtual machine
  * +------------------+
@@ -36,7 +39,7 @@ enum { LEA ,IMM ,JMP ,CALL,JZ ,JNZ ,ENT ,ADJ ,LEV ,LI ,LC ,SI ,SC , PUSH,
  */
 enum { Num = 128, Fun, Sys, Glo, Loc, Id,
        Char, Else, Enum, If, Int, Return, Sizeof, While,
-       Assign, Cond, Lor, Lan, Or, Xor, And, Eq, Ne, Lt, Gt, Le, Ge, Shl, Shr, Add, Sub, Mul, Div, Mod, Inc, Dec, Brak};
+       Assign, Cond, Lor, Lan, Or, Xor, And, Eq, Ne, Lt, Gt, Le, Ge, Shl, Shr, Add, Sub, Mul, Div, Mod, Inc, Dec, Brak, RET};
 
 enum { Token, Hash, Name, Type, Class, Value, BType, BClass, BValue, IdSize};
 /**
@@ -68,21 +71,20 @@ int expr_type;   // the type of an expression
 // 4: old bp pointer  <- index_of_bp
 // 5: local var 1
 // 6: local var 2
-int index_of_bp; // index of bp pointer on stack
+int index_of_bp;
 
 
 // Variables
 int  *text,          // text segment
      *old_text,      // for dump text segment
-     *stack;         // stack
+     *stack;         // stack pointer
 char *data;          // data segment
 
 int  *pc;            // program counter
 int  *bp;            // base address in heap
 int  *sp;
-int  ax;             // execu res
+int  ax;             // execution res
 int  cycle;          // virtual machine registers
-
 
 int  token;          // current token
 int token_val;       // value of current token (mainly for number)
@@ -94,6 +96,7 @@ int *current_id,     // current parsed ID
     *symbols;        // symbol table
 int *idmain;         // the `main` function
 
+// next function will load in the next token from src domain
 void next() {
     char *last_pos;
     int hash;
@@ -101,16 +104,15 @@ void next() {
     while (token = *src) {
         ++src;
 
-        // parse token here
         if (token == '\n') {
+            // change line request
             ++line;
         } else if (token == '#') {
-            // skip macro, because we will not support it
+            // skip macro
             while (*src != 0 && *src != '\n') {
                 src++;
             }
         } else if ((token >= 'a' && token <= 'z') || (token >= 'A' && token <= 'Z') || (token == '_')) {
-
             // parse identifier
             last_pos = src - 1;
             hash = token;
@@ -120,24 +122,24 @@ void next() {
                 src++;
             }
 
-            // look for existing identifier, linear search
+            // look for existing identifier
             current_id = symbols;
             while (current_id[Token]) {
                 if (current_id[Hash] == hash && !memcmp((char *)current_id[Name], last_pos, src - last_pos)) {
-                    //found one, return
+                    //found and return
                     token = current_id[Token];
                     return;
                 }
                 current_id = current_id + IdSize;
             }
 
-            // store new ID
+            // create new ID
             current_id[Name] = (int)last_pos;
             current_id[Hash] = hash;
             token = current_id[Token] = Id;
             return;
         } else if (token >= '0' && token <= '9') {
-            // parse number, three kinds: dec(123) hex(0x123) oct(017)
+            // parse number: dec(123), hex(0x123) or oct(017)
             token_val = token - '0';
             if (token_val > 0) {
                 // dec, starts with [1-9]
@@ -160,11 +162,11 @@ void next() {
                     }
                 }
             }
-
             token = Num;
             return;
-        } else if (token == '"' || token == '\'') {// String (\n)
 
+        } else if (token == '"' || token == '\'') {
+            // String (\n)
             last_pos = data;
             while (*src != 0 && *src != token) {
                 token_val = *src++;
@@ -175,34 +177,30 @@ void next() {
                         token_val = '\n';
                     }
                 }
-
                 if (token == '"') {
                     *data++ = token_val;
                 }
             }
 
             src++;
-            // if it is a single character, return Num token
+            // if it is a single character, return Num ? TODO
             if (token == '"') {
                 token_val = (int)last_pos;
             } else {
                 token = Num;
             }
-
             return;
         } else if (token == '/') {
             if (*src == '/') {
-                // skip comments
+                // Comment
                 while (*src != 0 && *src != '\n') {
                     ++src;
                 }
             } else {
-                // divide operator
                 token = Div;
                 return;
             }
         } else if (token == '=') {
-            // parse '==' and '='
             if (*src == '=') {
                 src ++;
                 token = Eq;
@@ -211,7 +209,6 @@ void next() {
             }
             return;
         } else if (token == '+') {
-            // parse '+' and '++'
             if (*src == '+') {
                 src ++;
                 token = Inc;
@@ -220,7 +217,6 @@ void next() {
             }
             return;
         } else if (token == '-') {
-            // parse '-' and '--'
             if (*src == '-') {
                 src ++;
                 token = Dec;
@@ -229,14 +225,12 @@ void next() {
             }
             return;
         } else if (token == '!') {
-            // parse '!='
             if (*src == '=') {
                 src++;
                 token = Ne;
             }
             return;
         } else if (token == '<') {
-            // parse '<=', '<<' or '<'
             if (*src == '=') {
                 src ++;
                 token = Le;
@@ -248,7 +242,6 @@ void next() {
             }
             return;
         } else if (token == '>') {
-            // parse '>=', '>>' or '>'
             if (*src == '=') {
                 src ++;
                 token = Ge;
@@ -260,7 +253,6 @@ void next() {
             }
             return;
         } else if (token == '|') {
-            // parse '|' or '||'
             if (*src == '|') {
                 src ++;
                 token = Lor;
@@ -269,7 +261,6 @@ void next() {
             }
             return;
         } else if (token == '&') {
-            // parse '&' and '&&'
             if (*src == '&') {
                 src ++;
                 token = Lan;
@@ -300,6 +291,9 @@ void next() {
     return;
 }
 
+// Expression will transfer the token to x86 assembly according to its precedence
+// http://en.cppreference.com/w/c/language/operator_precedence
+
 void expression(int level) {
     int *id;
     int tmp;
@@ -322,8 +316,7 @@ void expression(int level) {
             while (token == '"') {
                 match('"');
             }
-            // append the end of string character '\0', all the data are default
-            // to 0, so just move data one position forward.
+            // append the end of string character '\0'
             data = (char *)(((int)data + sizeof(int)) & (-sizeof(int)));
             expr_type = PTR;
         } else if (token == Sizeof) {
@@ -347,11 +340,10 @@ void expression(int level) {
             *++text = (expr_type == CHAR) ? sizeof(char) : sizeof(int);
             expr_type = INT;
         } else if (token == Id) {
-            // there are several type when occurs to Id
-            // but this is unit, so it can only be
             // 1. function call
             // 2. Enum variable
             // 3. global/local variable
+
             match(Id);
             id = current_id;
             if (token == '(') {
@@ -386,6 +378,7 @@ void expression(int level) {
                     *++text = tmp;
                 }
                 expr_type = id[Type];
+
             } else if (id[Class] == Num) {
                 // enum variable
                 *++text = IMM;
@@ -403,8 +396,8 @@ void expression(int level) {
                     printf("%d: undefined variable\n", line);
                     exit(-1);
                 }
-                // 6. emit code, default behaviour is to load the value of the
-                // address which is stored in `ax`
+                // emit code, default behaviour is to load the value of the
+                // address stored in `ax`
                 expr_type = id[Type];
                 *++text = (expr_type == Char) ? LC : LI;
             }
@@ -456,7 +449,6 @@ void expression(int level) {
             match('!');
             expression(Inc);
 
-            // emit code, use <expr> == 0
             *++text = PUSH;
             *++text = IMM;
             *++text = 0;
@@ -475,6 +467,7 @@ void expression(int level) {
             *++text = XOR;
 
             expr_type = INT;
+
         } else if (token == Add) {
             // +var, do nothing
             match(Add);
@@ -718,8 +711,6 @@ void expression(int level) {
                 expr_type = tmp;
             } else if (token == Inc || token == Dec) {
                 // postfix inc(++) and dec(--)
-                // we will increase the value to the variable and decrease it
-                // on `ax` to get its original value.
                 if (*text == LI) {
                     *text = PUSH;
                     *++text = LI;
@@ -743,6 +734,7 @@ void expression(int level) {
                 *++text = (expr_type > PTR) ? sizeof(int) : sizeof(char);
                 *++text = (token == Inc) ? SUB : ADD;
                 match(token);
+
             } else if (token == Brak) {
                 // array access var[xx]
                 match(Brak);
@@ -751,7 +743,7 @@ void expression(int level) {
                 match(']');
 
                 if (tmp > PTR) {
-                    // pointer, `not char *`
+                    // pointer
                     *++text = PUSH;
                     *++text = IMM;
                     *++text = sizeof(int);
@@ -771,8 +763,7 @@ void expression(int level) {
     }
 }
 
-
-
+// Assert the current token
 void match(int tk) {
     if (token == tk) {
         next();
@@ -782,6 +773,7 @@ void match(int tk) {
     }
 }
 
+// Analysis statement and break it down to expression
 void statement() {
     int *a, *b; // bess for branch control
 
@@ -930,9 +922,12 @@ void function_parameter() {
         match(Id);
 
         // store the local variable
-        current_id[BClass] = current_id[Class]; current_id[Class]  = Loc;
-        current_id[BType]  = current_id[Type];  current_id[Type]   = type;
-        current_id[BValue] = current_id[Value]; current_id[Value]  = params++;   // index of current parameter
+        current_id[BClass] = current_id[Class];
+        current_id[Class]  = Loc;
+        current_id[BType]  = current_id[Type];
+        current_id[Type]   = type;
+        current_id[BValue] = current_id[Value];
+        current_id[Value]  = params++;   // index of current parameter
         if (token == ',') {
             match(',');
         }
@@ -968,9 +963,12 @@ void function_body() {
             }
             match(Id);
             // store the local variable
-            current_id[BClass] = current_id[Class]; current_id[Class]  = Loc;
-            current_id[BType]  = current_id[Type];  current_id[Type]   = type;
-            current_id[BValue] = current_id[Value]; current_id[Value]  = ++pos_local;   // index of current parameter
+            current_id[BClass] = current_id[Class];
+            current_id[Class]  = Loc;
+            current_id[BType]  = current_id[Type];
+            current_id[Type]   = type;
+            current_id[BValue] = current_id[Value];
+            current_id[Value]  = ++pos_local;   // index of current parameter
             if (token == ',') {
                 match(',');
             }
@@ -988,14 +986,15 @@ void function_body() {
     *++text = LEV;
 }
 
-
+// Top level for all global declaration
 void global_declaration() {
     int type; // tmp, actual type for variable
     int i; // tmp
     basetype = INT;
     // parse enum, this should be treated alone.
     if (token == Enum) {
-        // enum [id] { a = 10, b = 20, ... }
+        // enum [id] { a = 10, b = 20, ...  }
+        //           |<-enum_declaration()->|
         match(Enum);
         if (token != '{') {
             match(Id); // skip the [id] part
@@ -1020,7 +1019,6 @@ void global_declaration() {
     // parse the comma seperated variable declaration.
     while (token != ';' && token != '}') {
         type = basetype;
-        // parse pointer type, note that there may exist `int ****x;`
         while (token == Mul) {
             match(Mul);
             type = type + PTR;
@@ -1085,15 +1083,14 @@ void enum_declaration() {
 
 
 void program() {
-    next(); // get next token
+    next();
     while (token > 0) {
         global_declaration();
         //printf("token is: %c\n", token);
-        
     }
 }
 
-
+// run the assembly code be generated
 int eval() {
     int op, *tmp;
     while (1) {
@@ -1110,7 +1107,7 @@ int eval() {
         else if (op == JZ)   {pc = ax ? pc + 1 : (int *)*pc;}                  // jump if ax is zero
         else if (op == JNZ)  {pc = ax ? (int *)*pc : pc + 1;}                  // jump if ax is zero
         else if (op == CALL) {*--sp = (int)(pc+1); pc = (int *)*pc;}           // call subroutine
-        //else if (op == RET)  {pc = (int *)*sp++;}                            // return from subroutine;
+        else if (op == RET)  {pc = (int *)*sp++;}                              // return from subroutine
         else if (op == ENT)  {                                                 // make new stack frame
             *--sp = (int)bp; 
             bp = sp; 
@@ -1174,7 +1171,7 @@ int main(int argc, char **argv) {
     argc--;
     argv++;
 
-    poolsize = 127 * 1024; // arbitrary size
+    poolsize = 127 * 1024; // arbitrary size, TODO: (> 128 will crash the program)
     line = 1;
 
     if ((fd = open(*argv, 0)) < 0) {

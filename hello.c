@@ -1,9 +1,7 @@
 #include <stdio.h>
 #include "no_file.h"
 // Comment Comment
-/* 
-    multi line comment 
-*/
+
 void dummy() {
     int t;
     t = 1;
