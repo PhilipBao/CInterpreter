@@ -1,14 +1,13 @@
 #include <stdio.h>
+#include "no_file.h"
 // Comment Comment
+/* 
+    multi line comment 
+*/
 void dummy() {
     int t;
     t = 1;
     if (t == 1) {
-        ;
-    } else {
-        ;
-    }
-    if (t == 0) {
         ;
     } else {
         ;
@@ -27,7 +26,7 @@ int fibonacci(int i){
 int main(){
     int i;
     i=0;
-    while (i < 10) {
+    while (i <= 15) {
         printf("fibonacci(%d) = %d\n", i, fibonacci(i));
         i = i + 1;
     }
